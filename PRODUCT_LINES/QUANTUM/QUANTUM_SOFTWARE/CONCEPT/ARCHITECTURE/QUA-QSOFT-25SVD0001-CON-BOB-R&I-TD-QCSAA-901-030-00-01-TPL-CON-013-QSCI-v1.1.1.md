@@ -599,6 +599,46 @@ class DeterministicAdmissibilityEngine:
                 return parts[1].strip()
         return action
     
+    def _eval_node(self, node, context, safe_ops):
+        """
+        Recursively evaluate AST node with safe operators only
+        """
+        import ast
+        
+        if isinstance(node, ast.Constant):
+            return node.value
+        elif isinstance(node, ast.Name):
+            # Look up variable in context (e.g., "qkd", "qnav")
+            return context.get(node.id)
+        elif isinstance(node, ast.Attribute):
+            # Handle dotted access like "qkd.enabled"
+            obj = self._eval_node(node.value, context, safe_ops)
+            return getattr(obj, node.attr, None) if obj else None
+        elif isinstance(node, ast.Compare):
+            # Handle comparison operations
+            left = self._eval_node(node.left, context, safe_ops)
+            for op, comparator in zip(node.ops, node.comparators):
+                right = self._eval_node(comparator, context, safe_ops)
+                op_func = safe_ops.get(type(op))
+                if op_func is None:
+                    raise ValueError(f"Unsupported operator: {type(op)}")
+                if not op_func(left, right):
+                    return False
+                left = right
+            return True
+        elif isinstance(node, ast.BoolOp):
+            # Handle boolean operations (and, or)
+            op_func = safe_ops.get(type(node.op))
+            if op_func is None:
+                raise ValueError(f"Unsupported operator: {type(node.op)}")
+            values = [self._eval_node(v, context, safe_ops) for v in node.values]
+            result = values[0]
+            for value in values[1:]:
+                result = op_func(result, value)
+            return result
+        else:
+            raise ValueError(f"Unsupported AST node type: {type(node)}")
+    
     def _determine_decision(self, context, passed, failed):
         """Determine final admissibility decision"""
         critical_checks = ['CHK-QNAV-002', 'CHK-ENV-001', 'CHK-CYB-004', 'CHK-SAF-002']
@@ -1168,7 +1208,7 @@ atr_vector:
       - "CHK-SAF-002"
     proof_hash:
       algorithm: "sha256"
-      digest: "f7c3bc1d808e04732adf679965ccc34ca7ae3441"
+      digest: "f7c3bc1d808e04732adf679965ccc34ca7ae3441b8c7d5e9f0a1b2c3d4e5f6a7"
       format_version: "1.0"
     fallback_vector_ref: null
 
