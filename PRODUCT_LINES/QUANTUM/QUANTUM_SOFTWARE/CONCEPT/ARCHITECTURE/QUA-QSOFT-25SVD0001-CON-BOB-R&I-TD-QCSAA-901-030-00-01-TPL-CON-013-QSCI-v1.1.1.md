@@ -188,7 +188,10 @@ atr_vector:
       - "CHK-ENV-001"
       - "CHK-CYB-004"
       - "CHK-SAF-002"
-    proof_hash: "sha256:..."
+    proof_hash:
+      algorithm: "sha256"
+      digest: "..."
+      format_version: "1.0"
     fallback_vector_ref: "ATR-VEC-..."
 
   authority_signatures:
@@ -487,6 +490,7 @@ class DeterministicAdmissibilityEngine:
         self.ruleset = self._load_ruleset("ATR-RULES-001")
         self.rule_version = "1.0.0"
         self.audit_logger = AuditLogger()
+        self.hash_algorithm = 'sha256'  # Configurable hash algorithm
         
     async def evaluate(self, atr_vector):
         """
@@ -541,19 +545,59 @@ class DeterministicAdmissibilityEngine:
     def _evaluate_rule(self, rule, context):
         """Evaluate single rule against context (deterministic)"""
         try:
-            condition_result = eval(rule.if_condition, {"__builtins__": {}}, context)
+            # Use safe expression parser instead of eval for security
+            condition_result = self._safe_evaluate_expression(rule.if_condition, context)
             
             if condition_result:
-                action = eval(rule.then_action, {"__builtins__": {}}, context)
+                action = self._safe_evaluate_action(rule.then_action, context)
                 return RuleResult(passed=True, action=action, context_updates={})
             else:
-                action = eval(rule.else_action, {"__builtins__": {}}, context)
+                action = self._safe_evaluate_action(rule.else_action, context)
                 return RuleResult(passed=False, action=action, context_updates={})
                 
         except Exception as e:
             # Log error and fail safe
             self.audit_logger.log_error(f"Rule {rule.id} evaluation failed: {e}")
             return RuleResult(passed=False, action="REJECT", context_updates={})
+    
+    def _safe_evaluate_expression(self, expression, context):
+        """
+        Safely evaluate boolean expression using AST parsing
+        Only allows comparison operators and logical operators
+        """
+        import ast
+        import operator
+        
+        # Define safe operators
+        safe_ops = {
+            ast.Eq: operator.eq,
+            ast.NotEq: operator.ne,
+            ast.Lt: operator.lt,
+            ast.LtE: operator.le,
+            ast.Gt: operator.gt,
+            ast.GtE: operator.ge,
+            ast.And: lambda a, b: a and b,
+            ast.Or: lambda a, b: a or b,
+            ast.In: lambda a, b: a in b,
+        }
+        
+        try:
+            tree = ast.parse(expression, mode='eval')
+            return self._eval_node(tree.body, context, safe_ops)
+        except Exception as e:
+            raise ValueError(f"Invalid expression: {expression}") from e
+    
+    def _safe_evaluate_action(self, action, context):
+        """
+        Safely evaluate action assignment
+        Only allows simple variable assignments
+        """
+        # Parse action like "qkd.enabled = true"
+        if '=' in action:
+            parts = action.split('=')
+            if len(parts) == 2:
+                return parts[1].strip()
+        return action
     
     def _determine_decision(self, context, passed, failed):
         """Determine final admissibility decision"""
@@ -571,17 +615,27 @@ class DeterministicAdmissibilityEngine:
         return 'REJECT'
     
     def _generate_proof_hash(self, vector, passed, failed, decision):
-        """Generate cryptographic proof of decision"""
+        """Generate cryptographic proof of decision with algorithm versioning"""
         proof_data = {
             'vector_id': vector.id,
             'ruleset_version': self.rule_version,
             'checks_passed': sorted(passed),
             'checks_failed': sorted(failed),
             'decision': decision,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow().isoformat(),
+            'hash_algorithm': self.hash_algorithm  # Algorithm version tracking
         }
         
-        return f"sha256:{hashlib.sha256(json.dumps(proof_data, sort_keys=True).encode()).hexdigest()}"
+        # Generate hash based on configured algorithm
+        hash_func = getattr(hashlib, self.hash_algorithm)
+        hash_digest = hash_func(json.dumps(proof_data, sort_keys=True).encode()).hexdigest()
+        
+        # Return structured format for future algorithm migration
+        return {
+            'algorithm': self.hash_algorithm,
+            'digest': hash_digest,
+            'format_version': '1.0'
+        }
 ```
 
 #### 3.5.3 Key Properties
@@ -1112,7 +1166,10 @@ atr_vector:
       - "CHK-ENV-001"
       - "CHK-CYB-004"
       - "CHK-SAF-002"
-    proof_hash: "sha256:f7c3bc1d808e04732adf679965ccc34ca7ae3441"
+    proof_hash:
+      algorithm: "sha256"
+      digest: "f7c3bc1d808e04732adf679965ccc34ca7ae3441"
+      format_version: "1.0"
     fallback_vector_ref: null
 
   authority_signatures:
