@@ -902,7 +902,7 @@ evidence_artifact:
   validation:
     peer_reviewed: true
     reviewers: ["Dr. A. Quantum", "Dr. B. Aerospace"]
-    hash: "sha256:a3f4b2c1d5e6f7g8h9i0j1k2l3m4n5o6"
+    hash: "sha256:a3f4b2c1d5e6f7a8b9c0d1e2f3a4b5c6"
     
   storage:
     location: "s3://aqua-evidence-store/benchmarks/2025-08/"
@@ -1033,7 +1033,7 @@ benchmark_results:
     error_rate: 0.00048             # ✓ Better than spec
     
   validation:
-    hash: "sha256:a3f4b2c1d5e6f7g8h9i0j1k2l3m4n5o6"
+    hash: "sha256:a3f4b2c1d5e6f7a8b9c0d1e2f3a4b5c6"
     reviewers: ["Dr. A. Quantum", "Dr. B. Aerospace"]
     approved: true
 ```
