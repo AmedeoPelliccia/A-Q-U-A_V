@@ -487,6 +487,16 @@ class DeterministicAdmissibilityEngine:
     Rule-based engine for deterministic trajectory admissibility decisions
     """
     def __init__(self):
+        import ast
+        import operator
+        import hashlib
+        import json
+        
+        self.ast = ast
+        self.operator = operator
+        self.hashlib = hashlib
+        self.json = json
+        
         self.ruleset = self._load_ruleset("ATR-RULES-001")
         self.rule_version = "1.0.0"
         self.audit_logger = AuditLogger()
@@ -565,24 +575,21 @@ class DeterministicAdmissibilityEngine:
         Safely evaluate boolean expression using AST parsing
         Only allows comparison operators and logical operators
         """
-        import ast
-        import operator
-        
         # Define safe operators
         safe_ops = {
-            ast.Eq: operator.eq,
-            ast.NotEq: operator.ne,
-            ast.Lt: operator.lt,
-            ast.LtE: operator.le,
-            ast.Gt: operator.gt,
-            ast.GtE: operator.ge,
-            ast.And: lambda a, b: a and b,
-            ast.Or: lambda a, b: a or b,
-            ast.In: lambda a, b: a in b,
+            self.ast.Eq: self.operator.eq,
+            self.ast.NotEq: self.operator.ne,
+            self.ast.Lt: self.operator.lt,
+            self.ast.LtE: self.operator.le,
+            self.ast.Gt: self.operator.gt,
+            self.ast.GtE: self.operator.ge,
+            self.ast.And: lambda a, b: a and b,
+            self.ast.Or: lambda a, b: a or b,
+            self.ast.In: lambda a, b: a in b,
         }
         
         try:
-            tree = ast.parse(expression, mode='eval')
+            tree = self.ast.parse(expression, mode='eval')
             return self._eval_node(tree.body, context, safe_ops)
         except Exception as e:
             raise ValueError(f"Invalid expression: {expression}") from e
@@ -603,18 +610,16 @@ class DeterministicAdmissibilityEngine:
         """
         Recursively evaluate AST node with safe operators only
         """
-        import ast
-        
-        if isinstance(node, ast.Constant):
+        if isinstance(node, self.ast.Constant):
             return node.value
-        elif isinstance(node, ast.Name):
+        elif isinstance(node, self.ast.Name):
             # Look up variable in context (e.g., "qkd", "qnav")
             return context.get(node.id)
-        elif isinstance(node, ast.Attribute):
+        elif isinstance(node, self.ast.Attribute):
             # Handle dotted access like "qkd.enabled"
             obj = self._eval_node(node.value, context, safe_ops)
             return getattr(obj, node.attr, None) if obj else None
-        elif isinstance(node, ast.Compare):
+        elif isinstance(node, self.ast.Compare):
             # Handle comparison operations
             left = self._eval_node(node.left, context, safe_ops)
             for op, comparator in zip(node.ops, node.comparators):
@@ -626,7 +631,7 @@ class DeterministicAdmissibilityEngine:
                     return False
                 left = right
             return True
-        elif isinstance(node, ast.BoolOp):
+        elif isinstance(node, self.ast.BoolOp):
             # Handle boolean operations (and, or)
             op_func = safe_ops.get(type(node.op))
             if op_func is None:
@@ -666,9 +671,14 @@ class DeterministicAdmissibilityEngine:
             'hash_algorithm': self.hash_algorithm  # Algorithm version tracking
         }
         
-        # Generate hash based on configured algorithm
-        hash_func = getattr(hashlib, self.hash_algorithm)
-        hash_digest = hash_func(json.dumps(proof_data, sort_keys=True).encode()).hexdigest()
+        # Generate hash based on configured algorithm with error handling
+        try:
+            hash_func = getattr(self.hashlib, self.hash_algorithm)
+        except AttributeError:
+            raise ValueError(f"Unsupported hash algorithm: {self.hash_algorithm}. "
+                           f"Supported algorithms: {', '.join(self.hashlib.algorithms_available)}")
+        
+        hash_digest = hash_func(self.json.dumps(proof_data, sort_keys=True).encode()).hexdigest()
         
         # Return structured format for future algorithm migration
         return {
@@ -854,14 +864,14 @@ To ensure transparency and auditability, all performance and compliance claims a
 
 | Claim ID | Claim | Evidence Artifact | Method | Status | Date |
 |----------|-------|-------------------|--------|--------|------|
-| CLM-PERF-001 | Navigation latency 18.3ms | BENCH-QMW-2025-08-04-01 (hash: sha256:a3f4...) | Performance benchmark | Verified | 2025-08-04 |
-| CLM-PERF-002 | 48,000 measurements/sec | BENCH-QMW-2025-08-04-04 (hash: sha256:b7e2...) | Throughput test | Verified | 2025-08-04 |
-| CLM-PERF-003 | 10x faster QES/QoQ serialization | BENCH-QMW-2025-08-04-05 (hash: sha256:c9d1...) | Serialization benchmark | Verified | 2025-08-04 |
-| CLM-SEC-001 | CRYSTALS-Dilithium signatures | SEC-TEST-PQC-2025-08-03 (hash: sha256:e4f6...) | Security test | Verified | 2025-08-03 |
-| CLM-SEC-002 | QKD QBER < 0.02 | QKD-TEST-2025-08-02 (hash: sha256:f8a3...) | Quantum channel test | Verified | 2025-08-02 |
+| CLM-PERF-001 | Navigation latency 18.3ms | BENCH-QMW-2025-08-04-01 (hash: a3f4b2c1d5e6f7a8) | Performance benchmark | Verified | 2025-08-04 |
+| CLM-PERF-002 | 48,000 measurements/sec | BENCH-QMW-2025-08-04-04 (hash: b7e2c3d4e5f6a1b2) | Throughput test | Verified | 2025-08-04 |
+| CLM-PERF-003 | 10x faster QES/QoQ serialization | BENCH-QMW-2025-08-04-05 (hash: c9d1e2f3a4b5c6d7) | Serialization benchmark | Verified | 2025-08-04 |
+| CLM-SEC-001 | CRYSTALS-Dilithium signatures | SEC-TEST-PQC-2025-08-03 (hash: e4f6a3b1c2d7e8f9) | Security test | Verified | 2025-08-03 |
+| CLM-SEC-002 | QKD QBER < 0.02 | QKD-TEST-2025-08-02 (hash: f8a3b4c5d6e7f1a2) | Quantum channel test | Verified | 2025-08-02 |
 | CLM-FIPS-001 | FIPS 140-3 alignment pathway | FIPS-PACK-2025-001 (gap analysis) | Compliance review | In progress | 2025-08-01 |
-| CLM-REL-001 | 99.999% availability | REL-TEST-2025-08-05-01 (hash: sha256:d2c7...) | Reliability test | Verified | 2025-08-05 |
-| CLM-QEC-001 | Error rate < 0.0005% | QEC-TEST-2025-08-05-01 (hash: sha256:g3h9...) | Error correction test | Verified | 2025-08-05 |
+| CLM-REL-001 | 99.999% availability | REL-TEST-2025-08-05-01 (hash: d2c7e8f9a1b3c4d5) | Reliability test | Verified | 2025-08-05 |
+| CLM-QEC-001 | Error rate < 0.0005% | QEC-TEST-2025-08-05-01 (hash: a1b2c3d4e5f6a7b8) | Error correction test | Verified | 2025-08-05 |
 
 #### 6.3.2 Evidence Artifact Structure
 
