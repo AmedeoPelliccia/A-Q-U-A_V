@@ -49,6 +49,11 @@ This repository serves as the **Master Documentation Center** for the AQUA-V (Ae
 | **[TEMPLATES](./TEMPLATES/)** | Standard document templates and formats | Active | ✅ |
 | **[UTCS_SYSTEM](./UTCS_SYSTEM/)** | Universal Technical Classification System documentation | Active | ✅ |
 
+### Technical Analysis Documents
+- [QQQ Foundation & ACQUA Architecture](./TECHNICAL_ANALYSIS/QQQ_FOUNDATION_ACQUA_ARCHITECTURE.md)
+- [Enhanced HAL Interface Analysis](./TECHNICAL_ANALYSIS/ENHANCED_HAL_INTERFACE_ANALYSIS.md)
+- [Quantum HAL Safety-Critical Analysis](./TECHNICAL_ANALYSIS/QUANTUM_HAL_SAFETY_CRITICAL_ANALYSIS.md)
+
 ---
 
 ## 🚀 QUICK START GUIDE
